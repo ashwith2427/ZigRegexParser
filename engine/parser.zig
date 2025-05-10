@@ -62,6 +62,7 @@ const Factor = struct {
     atom: *Atom,
     metachar: ?Quantifier = null,
     pub fn deinit(self: *Factor, allocator: std.mem.Allocator) void {
+        self.atom.deinit(allocator);
         allocator.destroy(self.atom);
     }
 };
