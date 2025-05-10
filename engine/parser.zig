@@ -45,6 +45,7 @@ const Term = struct {
     factor: Factor,
     term: ?*Term = null,
     pub fn deinit(self: *Term, allocator: std.mem.Allocator) void {
+        self.factor.deinit(allocator);
         if (self.term) |term| {
             term.deinit(allocator);
             allocator.destroy(term);
