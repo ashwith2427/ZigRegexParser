@@ -42,10 +42,11 @@ const Alt = struct {
 };
 
 const Term = struct {
-    factor: Factor,
+    factor: *Factor,
     term: ?*Term = null,
     pub fn deinit(self: *Term, allocator: std.mem.Allocator) void {
         self.factor.deinit(allocator);
+        allocator.destroy(self.factor);
         if (self.term) |term| {
             term.deinit(allocator);
             allocator.destroy(term);
@@ -153,6 +154,7 @@ fn parseTerm(self: *Parser) ParserError!?*Term {
     const term_ptr = try self.allocator.create(Term);
     const factor = try self.parseFactor();
     if (factor == null) {
+        self.allocator.destroy(term_ptr);
         return null;
     }
     const term = try self.parseTerm();
@@ -178,24 +180,28 @@ fn getmetachar(token: Token) ?Quantifier {
     }
 }
 
-fn parseFactor(self: *Parser) ParserError!?Factor {
+fn parseFactor(self: *Parser) ParserError!?*Factor {
     const atom = try self.parseAtom();
+    const factor_ptr = try self.allocator.create(Factor);
     if (atom) |a| {
         const metachar = getmetachar(self.tokens[self.idx]);
         if (metachar) |meta| {
-            return .{
+            factor_ptr.* = .{
                 .atom = a,
                 .metachar = meta,
             };
+            return factor_ptr;
         }
-        return .{ .atom = a };
+        factor_ptr.* = .{
+            .atom = a,
+        };
     }
+    self.allocator.destroy(factor_ptr);
     return null;
 }
 
 fn parseAtom(self: *Parser) ParserError!?*Atom {
     const atom = try self.allocator.create(Atom);
-    errdefer self.allocator.destroy(atom);
     if (self.tokens[self.idx].kind == .OpenParen) {
         try self.eatToken();
         const alt = try self.parseExpr();
@@ -210,6 +216,7 @@ fn parseAtom(self: *Parser) ParserError!?*Atom {
             };
             return atom;
         }
+        self.allocator.destroy(atom);
         return null;
     } else if (self.tokens[self.idx].kind == .OpenBracket) {
         try self.eatToken();
@@ -229,6 +236,7 @@ fn parseAtom(self: *Parser) ParserError!?*Atom {
         if (self.tokens[self.idx].kind == .CloseBrace) {
             try self.eatToken();
         } else {
+            std.debug.print("{any}", .{self.tokens[self.idx]});
             return ParserError.NoClosingBrace;
         }
 
@@ -238,6 +246,7 @@ fn parseAtom(self: *Parser) ParserError!?*Atom {
             };
             return atom;
         }
+        self.allocator.destroy(atom);
         return null;
     } else if (self.tokens[self.idx].kind == .Space or
         self.tokens[self.idx].kind == .Word or
@@ -252,6 +261,7 @@ fn parseAtom(self: *Parser) ParserError!?*Atom {
         };
         return atom;
     }
+    self.allocator.destroy(atom);
     return null;
 }
 
@@ -408,7 +418,7 @@ fn eatToken(self: *Parser) ParserError!void {
 const QueueItem = union(enum) {
     alt: *Alt,
     term: *Term,
-    factor: Factor,
+    factor: *Factor,
     atom: *Atom,
     chclass: *CharacterClass,
     chrange: CharacterRange,

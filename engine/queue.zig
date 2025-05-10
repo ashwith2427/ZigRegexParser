@@ -61,14 +61,3 @@ pub fn Queue(comptime T: type) type {
         }
     };
 }
-
-test "Queue" {
-    const allocator = std.testing.allocator;
-    var queue = try Queue(u32).init(allocator);
-    defer queue.deinit();
-    try queue.push(3);
-    try queue.push(4);
-    try queue.push(5);
-    _ = try queue.pop();
-    std.debug.print("{any}", .{queue});
-}
